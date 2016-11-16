@@ -26,3 +26,10 @@ t = TestClass(6)
 print("T: %d" % t.num)
 t.increment()
 print("T: %d" % t.num)
+
+l = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+arraycopy([None] * 5, 0, l, 5, 5)
+print(l)
+
+for i in range(5):
+    print(i)

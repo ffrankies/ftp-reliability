@@ -53,7 +53,7 @@ class SlidingWindow(object):
     # End of constructor    
     
     def arraycopy(
-        self, src,destStart, dest=None, srcStart=0, length=1024):
+        self, src, destStart, dest=None, srcStart=0, length=1024):
         """
         A function to copy data from one list (array) to another. Made to 
         mimic 
@@ -81,9 +81,44 @@ class SlidingWindow(object):
         for index in range(srcStart, min(len(src), length)):
             dest[index - srcStart + destStart] = src[index]
     # End of arraycopy
+    
+    def slide(self):
+        """
+        Shifts the Sliding Window to the right. Shifts all the data in the
+        window left by the packet size, and all the data in the marks list to 
+        the left by 1, but only if the first element of marks is not -1 (has 
+        been received if on the Client side, or has been acknowledged if on the 
+        Server side.) Continues shifting the SlidingWindow to the right until 
+        the first element of marks becomes -1. 
+        """
+        while self.marks[0] != -1:
+            # Shift sliding window to the right
+            for i in range(len(self.window) - self.packetSize):
+                self.window[i] = self.window[i + self.packetSize]
+            # Nullify end of sliding window
+            self.arraycopy([None] * self.packetSize, 
+                           len(self.window) - self.packetSize)
+            #
+            # TO-DO: read next bytes of file into sliding window
+            # Code here
+            #
+            # Slide the marks list to the right
+            for i in range(len(self.marks) - 1):
+                self.marks[i] = self.marks[i + 1]
+            self.marks[len(self.marks) - 1] = -1
+            
 # End of SlidingWindow class            
               
 if __name__ == "__main__":
-    slidingWindow = SlidingWindow(filePath="try.txt", packetSize=1024)
+    slidingWindow = SlidingWindow(filePath="try.txt", packetSize=10)
+    temp = []
+    for i in range(50):
+        temp.append(i)
+    slidingWindow.arraycopy(temp, 0, length=50)
+    print(slidingWindow.window)
+    slidingWindow.marks[0] = 0
+    slidingWindow.marks[1] = 5
+    slidingWindow.slide()
+    print(slidingWindow.window)
         
         
