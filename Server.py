@@ -2,11 +2,11 @@ import SlidingWindow as window
 import socket
 from threading import Thread
 
-port = input("Please enter a port for connection: ")
+port = 2876
 print ("Creating server socket.")
 
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-serversocket.bind((socket.gethostname(), port))
+serversocket.bind((socket.gethostname(), int(port)))
 serversocket.listen(2)
 
 #Create a socket and pass it on to a thread
@@ -30,5 +30,5 @@ def HandleClients(address):
     - Finish send and potentially wait for another client request
     
     '''
-    
+    print("Handling a Client")
     
