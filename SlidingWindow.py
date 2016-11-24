@@ -226,7 +226,7 @@ class SlidingWindow(object):
         if index == None:
             index = self.start
         if index not in self.marks.keys():
-            print("Not ready to mark this packet yet")
+            print("Index %d is not within the Sliding Window" % index)
             return
         self.marks[index] = True
         if self.mode == 'Server':
