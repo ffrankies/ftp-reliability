@@ -1,12 +1,12 @@
 import SlidingWindow as window
 
-server = window.SlidingWindow('try.txt', mode='Server')
+server = window.SlidingWindow('files/try.txt', mode='Server')
 print("Started the Server Sliding Window")
 
 client = window.SlidingWindow(
-    "saved/trysaved.txt", mode='Client', fileSize=server.fileSize)
+    "saved/trysaved2.txt", mode='Client', fileSize=server.fileSize)
 print("Started the Client Sliding Window")
-    
+
 packets = server.getPackets()
 while not packets == []:
     for packet in packets:
