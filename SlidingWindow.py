@@ -255,6 +255,7 @@ class SlidingWindow(object):
             # Get rid of None values trailing in packet
             while temp[-1] == None:
                 del temp[-1]
+            print("Saving temp: %s" % temp)
             self.file.write(bytes(temp))
             self.bytesRead += len(temp)
             # Shift sliding window to the right
@@ -366,10 +367,24 @@ class SlidingWindow(object):
                 if self.bytesRead < self.fileSize:
                     return windowIndex
                 else:
+                    self.file.close()
                     return "Done"
         print("Error: for loop completed without saving bytes.")
         return -1
     # End of saveBytes()
+    
+    def isDone(self):
+        """
+        Returns true if the Sliding Window operation is done, false if not. 
+        Function identifies whether the operation is done by looking at the 
+        self.start parameter.
+        """
+        if self.start < self.fileSize:
+            return False
+        else:
+            return True
+    # End of isDone()
+        
 # End of SlidingWindow class
 
 if __name__ == "__main__":

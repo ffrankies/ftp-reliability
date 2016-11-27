@@ -79,14 +79,19 @@ class ServerInstance(object):
             "files/" + filename, mode='Server')
 
         # Thread to handle sending packets to the client
-        sendThread = Thread(target=self.HandleClients, args=(address, ))
-        sendThread.start()
+        self.sendThread = Thread(target=self.HandleClients, args=(address, ))
+        self.sendThread.daemon = True
+        self.sendThread.start()
 
         # Thread to handle acknowledgments from the client
-        ackThread = Thread(target=self.clientAcknowledgements)
-        ackThread.start()
+        self.ackThread = Thread(target=self.clientAcknowledgements)
+        self.ackThread.daemon = True
+        self.ackThread.start()
 
         print("Sliding Window set up on connection from %s" % address[0])
+        
+        self.sendThread.join()
+        self.ackThread.join()
 
     def HandleClients(self, address):
         '''
@@ -123,6 +128,7 @@ class ServerInstance(object):
             self.lock.acquire()
             packets = self.slidingWindow.getPackets()
             self.lock.release()
+        print("Packets left in sliding window: %d" % len(packets))
         return
 
     def clientAcknowledgements(self):
@@ -140,6 +146,9 @@ class ServerInstance(object):
             self.lock.acquire()
             self.slidingWindow.mark(int.from_bytes(index, byteorder='big'))
             self.lock.release()
+            if self.slidingWindow.isDone():
+                print("Finished sending file")
+                break
         # Server receives acknowledgment packets
         # Get the index of which packet they're acknowledging
         # [Ack][10 bytes of index][checksum]
@@ -171,9 +180,9 @@ class Server(object):
         #serversocket.listen(5)
 
         #Create a socket and pass it on to a thread
-        while 1:
+        #while 1:
             #(clientsocket, address) = serversocket.accept()
-            ServerInstance(serversocket, "address")
+        ServerInstance(serversocket, "address")
 
 if __name__ == "__main__":
     Server()
