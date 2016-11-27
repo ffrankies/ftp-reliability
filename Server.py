@@ -20,6 +20,9 @@ FREADYACK = (3).to_bytes(1, byteorder='big')
 # Packet containing bytes of file
 FPACKET = (4).to_bytes(1, byteorder='big')
 
+# Packet containing file acknowledgement
+FACK = (5).to_bytes(1, byteorder='big')
+
 print("Flags: %s %s %s %s" % (FNAME, FSIZE, FREADYACK, FPACKET))
 
 class ServerInstance(object):
@@ -118,11 +121,11 @@ class ServerInstance(object):
         window packets as received by the Client.
         """
         while 1:
-            acknowledgement = self.clientSocket.recv(40)
-            flag = acknowledgement[:2]
-            index = acknowledgement[2:12]
+            acknowledgement = self.clientSocket.recv(38)
+            flag = acknowledgement[:1]
+            index = acknowledgement[1:10]
             # Implementation for checking will be done in part 2
-            checksum = acknowledgement[12:]
+            checksum = acknowledgement[10:]
             self.lock.acquire()
             self.slidingWindow.mark(int.from_bytes(index, byteorder='big'))
             self.lock.release()

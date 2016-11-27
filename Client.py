@@ -18,7 +18,10 @@ FREADYACK = (3).to_bytes(1, byteorder='big')
 # Packet containing bytes of file
 FPACKET = (4).to_bytes(1, byteorder='big')
 
-print("Flags: %s %s %s %s" % (FNAME, FSIZE, FREADYACK, FPACKET))
+# Packet containing file acknowledgement
+FILEACK = (5).to_bytes(1, byteorder='big')
+
+print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 
 
 port = 2876
@@ -54,6 +57,12 @@ while 1:
     # Send same acknowledgement back to server to let it know that it can 
     # start sending file
     # Keep sending acknowledgement until server starts sending actual file
+    acknowledgement[0] = FREADYACK[0]
+    
+    # Send acknowledgment back to Server, this time with the file ready flag
+    clientSocket.send(acknowledgement, 11)
+            
+    
     # Might need a flag signalling that the server is sending file
     # Else can use global variables flags, maybe.
     
@@ -65,6 +74,33 @@ while 1:
         "saved/" + dest, mode='Client', fileSize=fileSize)
     #
     # Save file using slidingWindow
-    # Need to think of way of knowing when to stop receiving
+    # Not sure about the while, but it's the only way to keep receiving and 
+    # acknowledging packets at the same time
+    while 1:
+        packet = clientSocket.recv(1024)
+        if packet[0] == FPACKET[0]:
+            # Not sure about how to check that we have not received this 
+            # packet previously
+            packet[0] = (0).to_bytes(1, byteorder='big')
+            bytesSent = client.saveBytes(packet)
+            if bytesSent != -1:
+                # Building acknowledgement
+                acknowledgement = []
+                acknowledgement.extend(FILEACK[0])
+                acknowledgement.extend(packet[1:10])
+                acknowledgement.extend([0]*28)
+                clientSocket.send(acknowledgement, 38)
+        # Server will most likely never send a packet with nothing in it
+        # if packet[0] == None:
+        #     # We most likely know we have reached the end of file
+        #     packetType = int.from_bytes(packet[0])
+        #     print("End of File, packet type: %d" % packetType)
+        #     break;
+        
+    # Need to think of way of knowing when to stop receiving - maybe check the first
+    #    time we receive none bytes from the server, then it's the end of the file
+    # I don't know to implement it in sliding window cuz I haven't seen saveBytes
+    #   method in action
+    
     # I don't think I've implemented that in slidingWindow yet...
     # 
