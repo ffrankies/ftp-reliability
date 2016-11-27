@@ -27,10 +27,8 @@ print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 port = 2876
 print ("Creating connection to the server")
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#host = input("Please enter a host to connect to: ")
 host = "127.0.0.1"
 
-#clientSocket.connect((host, port))
 
 #Send the file request to the server
 while 1:
@@ -102,15 +100,8 @@ while 1:
             if bytesSent == "Done":
                 print("Done receiving file.")
                 break;
-        # Server will most likely never send a packet with nothing in it
-        # if packet[0] == None:
-        #     # We most likely know we have reached the end of file
-        #     packetType = int.from_bytes(packet[0])
-        #     print("End of File, packet type: %d" % packetType)
-        #     break;
 
-    # Need to think of way of knowing when to stop receiving - maybe check the first
-    #    time we receive none bytes from the server, then it's the end of the file
+    # Need to think of way of knowing when to stop receiving
     # I don't know to implement it in sliding window cuz I haven't seen saveBytes
     #   method in action
 

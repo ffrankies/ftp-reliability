@@ -177,11 +177,7 @@ class Server(object):
 
         serversocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         serversocket.bind(("127.0.0.1", port))
-        #serversocket.listen(5)
 
-        #Create a socket and pass it on to a thread
-        #while 1:
-            #(clientsocket, address) = serversocket.accept()
         ServerInstance(serversocket, "address")
 
 if __name__ == "__main__":
