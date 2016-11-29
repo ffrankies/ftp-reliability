@@ -255,7 +255,7 @@ class SlidingWindow(object):
             # Get rid of None values trailing in packet
             while temp[-1] == None:
                 del temp[-1]
-            print("Saving temp: %s" % temp)
+            #print("Saving temp: %s" % temp)
             self.file.write(bytes(temp))
             self.bytesRead += len(temp)
             # Shift sliding window to the right
@@ -342,7 +342,7 @@ class SlidingWindow(object):
         index = bytes[:10]
         # Do nothing if packet already received/marked
         index = int.from_bytes(index, byteorder='big')
-        if self.marks[index]:
+        if index in self.marks and self.marks[index]:
             print("Received duplicate packet.")
             return -2
         if index not in self.marks:

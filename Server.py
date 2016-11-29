@@ -22,9 +22,9 @@ FREADYACK = (3).to_bytes(1, byteorder='big')
 FPACKET = (4).to_bytes(1, byteorder='big')
 
 # Packet containing file acknowledgement
-FACK = (5).to_bytes(1, byteorder='big')
+FILEACK = (5).to_bytes(1, byteorder='big')
 
-print("Flags: %s %s %s %s" % (FNAME, FSIZE, FREADYACK, FPACKET))
+print("Flags: %s %s %s %s %s" % (FNAME, FSIZE, FREADYACK, FPACKET, FILEACK))
 
 class ServerInstance(object):
     """
@@ -35,7 +35,7 @@ class ServerInstance(object):
     author: Frank Derry Wanye
     author: Gloire Rubambiza
 
-    date: 11/23/2016
+    date: 11/29/2016
     """
 
     def __init__(self, clientSocket, add):
@@ -52,9 +52,13 @@ class ServerInstance(object):
 
         ###################################################################
         # Obtaining requested files from the Client
+        # If wrong packet received at this time, wait until right packet 
+        # is received before proceeding.
         ###################################################################
-        (filerequest, address) = clientSocket.recvfrom(1024)
-        filenameLen = int.from_bytes(filerequest[:10], byteorder='big')
+        (filerequest, address) = self.clientSocket.recvfrom(1024)
+        while not filerequest[0] == FNAME[0]:
+            (filerequest, address) = self.clientSocket.recvfrom(1024)
+        filenameLen = int.from_bytes(filerequest[1:10], byteorder='big')
         filename = filerequest[10:(10 + filenameLen)].decode("UTF-8")
         print("Requested file name: %s" % filename)
         # checksum = ???
@@ -65,7 +69,7 @@ class ServerInstance(object):
         filesize = os.path.getsize("files/" + filename)
         filesizePacket = []
         filesizePacket.extend(FSIZE)
-        filesizePacket.extend(filesize.to_bytes(10, byteorder='big'))
+        filesizePacket.extend(filesize.to_bytes(9, byteorder='big'))
         filesizePacket = bytes(filesizePacket)
         # Attach checksum later
         self.clientSocket.sendto(filesizePacket, address)
@@ -74,7 +78,13 @@ class ServerInstance(object):
         ######################################################################
         # Receiving ready signal from Client
         ######################################################################
+        (ready, address) = self.clientSocket.recvfrom(10)
+        while not ready[0] == FREADYACK[0]:
+            self.clientSocket.sendto(filesizePacket, address)
+            (ready, address) = self.clientSocket.recvfrom(10)
 
+        #time.sleep(5)
+        
         self.slidingWindow = window.SlidingWindow(
             "files/" + filename, mode='Server')
 
@@ -110,7 +120,7 @@ class ServerInstance(object):
         packets = self.slidingWindow.getPackets()
         self.lock.release()
         while not packets == []:
-            time.sleep(3)
+            time.sleep(1)
             print("Num packets in sliding window: %d" % len(packets))
             for packet in packets:
                 packet[0] = FPACKET[0]
@@ -138,17 +148,18 @@ class ServerInstance(object):
         """
         while 1:
             (acknowledgement, addr) = self.clientSocket.recvfrom(38)
-            print("Received acknowledgment from %s" % addr[0])
-            flag = acknowledgement[:1]
-            index = acknowledgement[1:10]
-            # Implementation for checking will be done in part 2
-            checksum = acknowledgement[10:]
-            self.lock.acquire()
-            self.slidingWindow.mark(int.from_bytes(index, byteorder='big'))
-            self.lock.release()
-            if self.slidingWindow.isDone():
-                print("Finished sending file")
-                break
+            if acknowledgement[0] == FILEACK[0]:
+                index = int.from_bytes(acknowledgement[1:10], byteorder='big')
+                print("Received acknowledgment from %s for packet %d" % 
+                      (addr[0], index))
+                # Implementation for checking will be done in part 2
+                checksum = acknowledgement[10:]
+                self.lock.acquire()
+                self.slidingWindow.mark(index)
+                self.lock.release()
+                if self.slidingWindow.isDone():
+                    print("Finished sending file")
+                    break
         # Server receives acknowledgment packets
         # Get the index of which packet they're acknowledging
         # [Ack][10 bytes of index][checksum]
