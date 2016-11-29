@@ -1,1 +1,0 @@
-This is a text file where I'm trying to test the file io in python. 1
