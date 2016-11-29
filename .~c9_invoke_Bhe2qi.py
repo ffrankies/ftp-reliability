@@ -35,22 +35,6 @@ clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 host = "127.0.0.1"
 
 
-###############################################################################
-# TO-DO:
-# Implement hashing in place of checksums
-# How:
-# sentHash = packet[x:x+56?]
-# zero out the portion of packet containing hash
-# hash = hashlib.sha224(packet.toString).hexdigest()
-# if sentHash == hash, 
-#    no corruption, 
-# else:
-#   packet corrupted and do nothing
-#
-# Might have to implement toString() method
-# Shouldn't be hard - essentially convert packet to bytes, encode bytes as UTF
-###############################################################################
-
 #Send the file request to the server
 #while 1:
 ###########################################################################
@@ -77,7 +61,7 @@ clientSocket.sendto(filenameBuffer, (host, port))
 while not acknowledgement[0] == FSIZE[0]:
     clientSocket.sendto(filenameBuffer, (host, port))
     (acknowledgement, addr) = clientSocket.recvfrom(10)
-# Proceed or print error message depending on contents of acknowledgment
+# Send again if acknowledgement not received within timeframe
 # Send again if acknowledgement not received within timeframe
 fileSize = int.from_bytes(acknowledgement[1:10], byteorder='big')
 

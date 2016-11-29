@@ -35,22 +35,6 @@ clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 host = "127.0.0.1"
 
 
-###############################################################################
-# TO-DO:
-# Implement hashing in place of checksums
-# How:
-# sentHash = packet[x:x+56?]
-# zero out the portion of packet containing hash
-# hash = hashlib.sha224(packet.toString).hexdigest()
-# if sentHash == hash, 
-#    no corruption, 
-# else:
-#   packet corrupted and do nothing
-#
-# Might have to implement toString() method
-# Shouldn't be hard - essentially convert packet to bytes, encode bytes as UTF
-###############################################################################
-
 #Send the file request to the server
 #while 1:
 ###########################################################################
@@ -107,7 +91,7 @@ clientSocket.sendto(bytes(ack), (host, port))
 while 1:
     (packet, addr) = clientSocket.recvfrom(1024)
     index = (int).from_bytes(packet[1:10], byteorder='big')
-    if packet[0] == FPACKET[0]: # If it is a file packet
+    
         print("Received file packet %d" % index)
         # Not sure about how to check that we have not received this
         # packet previously

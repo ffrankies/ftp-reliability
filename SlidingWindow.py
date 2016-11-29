@@ -128,27 +128,37 @@ class SlidingWindow(object):
         if not self.mode == 'Server':
             print("Error: Sliding Window not in Server mode: %s" % self.mode)
             return
-
+        
+        # Window will shift until index of start of window becomes greater
+        # than the size of the file
         while self.start < self.fileSize and self.marks[self.start]:
+            # Size of the data is = packetSize - index - checksum/hash
+            dataSize = self.packetSize - 10 - 56
+            
             # Shift sliding window to the right
             for i in range(len(self.window) - self.packetSize):
                 self.window[i] = self.window[i + self.packetSize]
+                
             # Nullify end of sliding window
             self.arraycopy([None] * self.packetSize,
                            len(self.window) - self.packetSize)
+                           
             if self.end < self.fileSize:
                 # Add 10 bytes of index to the next packet
-                self.arraycopy((self.end + (self.packetSize - 10)).to_bytes(
+                self.arraycopy((self.end + dataSize).to_bytes(
                                10, byteorder='big'),
-                               len(self.window) - self.packetSize)
-            # Append next bytes of file to SlidingWindow
+                               len(self.window) - self.packetSize) 
+                               
+            # Append next bytes of file to SlidingWindow - will append 
+            # an array of None if all file data has been read
             self.arraycopy(self.readBytes(),
                            len(self.window) - self.packetSize + 10)
+                           
             # Slide the marks list to the right
             del self.marks[self.start]
-            self.start += (self.packetSize - 10)
-            if (self.end + self.packetSize - 10) < self.fileSize:
-                self.end += (self.packetSize - 10)
+            self.start += dataSize
+            if (self.end + dataSize) < self.fileSize:
+                self.end += dataSize
                 self.marks[self.end] = False
     # End of slideServer()
 
@@ -170,16 +180,22 @@ class SlidingWindow(object):
 
         for i in range(5):
             index = self.end
+            
             if index >= self.fileSize:
                 self.arraycopy([None] * self.packetSize, i * self.packetSize)
+                
             self.marks[index] = False
+            
             # Appends index (sized to 10 bytes) to start of packet
             self.arraycopy((index).to_bytes(10, byteorder='big'),
                            i * self.packetSize)
+                           
             # Reads data from file and appends it to the packet
             self.arraycopy(self.readBytes(), (i * self.packetSize) + 10)
+            
             if i < 4:
-                self.end += (self.packetSize - 10)
+                self.end += (self.packetSize - 10 - 56)
+                
         self.start = 0
     # End of buildServerWindow()
 
@@ -201,16 +217,20 @@ class SlidingWindow(object):
 
         for i in range(5):
             index = self.end
+            
             if index >= self.fileSize:
                 self.arraycopy([None] * self.packetSize, i * self.packetSize)
+                
             self.marks[index] = False
+            
             # Appends index (sized to 10 bytes) to start of packet
             self.arraycopy((index).to_bytes(10, byteorder='big'),
                            i * self.packetSize)
-            # Reads data from file and appends it to the packet
-            # self.arraycopy(self.readBytes(), (i * self.packetSize) + 10)
+                           
+            # Increases the self.end parameter by effective data size
             if i < 4:
-                self.end += (self.packetSize - 10)
+                self.end += (self.packetSize - 10 - 56)
+                
         self.start = 0
     # End of buildClientWindow()
 
@@ -225,9 +245,11 @@ class SlidingWindow(object):
         """
         if index == None:
             index = self.start
+            
         if index not in self.marks.keys():
             print("Index %d is not within the Sliding Window" % index)
             return
+        
         self.marks[index] = True
         if self.mode == 'Server':
             self.slideServer()
@@ -245,35 +267,42 @@ class SlidingWindow(object):
         Server side.) Continues shifting the SlidingWindow to the right until
         the first element of marks becomes -1.
         """
+        dataSize = self.packetSize - 10 - 56
+        
         if not self.mode == 'Client':
             print("Error: Sliding Window not in Client mode: %s" % self.mode)
             return
 
         while self.start < self.fileSize and self.marks[self.start]:
             # Save first packet to file
-            temp = self.window[10:self.packetSize]
+            temp = self.window[(10 + 56):self.packetSize]
+            
             # Get rid of None values trailing in packet
             while temp[-1] == None:
                 del temp[-1]
-            #print("Saving temp: %s" % temp)
+            
             self.file.write(bytes(temp))
             self.bytesRead += len(temp)
+            
             # Shift sliding window to the right
             for i in range(len(self.window) - self.packetSize):
                 self.window[i] = self.window[i + self.packetSize]
+                
             # Nullify end of sliding window
             self.arraycopy([None] * self.packetSize,
                            len(self.window) - self.packetSize)
+                           
             if self.end < self.fileSize:
                 # Add 10 bytes of index to the next packet
                 self.arraycopy((self.end + (self.packetSize - 10)).to_bytes(
                                10, byteorder='big'),
                                len(self.window) - self.packetSize)
+                               
             # Slide the marks list to the right
             del self.marks[self.start]
-            self.start += (self.packetSize - 10)
-            if (self.end + self.packetSize - 10) < self.fileSize:
-                self.end += (self.packetSize - 10)
+            self.start += dataSize
+            if (self.end + dataSize) < self.fileSize:
+                self.end += dataSize
                 self.marks[self.end] = False
     # End of slideClient()
 
@@ -287,14 +316,20 @@ class SlidingWindow(object):
             print("Error: Sliding Window not in Server mode: %s" % self.mode)
             return
 
-        fileBytes = self.file.read(self.packetSize - 10)
+        # Reads packetSize - 10 - 56 bytes of file data
+        # 10 bytes reserved for index
+        # 56 bytes reserved for hash/checksum
+        fileBytes = self.file.read(self.packetSize - 10 - 56)
+        
         # if end of file has been reached
         if fileBytes == '':
             return ([None] * (self.packetSize - 10))
+            
+        # Hash is left blank at first
         temp = []
-        for i in fileBytes:
-            temp.append(i)
-        self.bytesRead += len(temp)
+        temp.extend([0] * 56)
+        temp.extend(fileBytes)
+        self.bytesRead += (len(temp) - 56)
         return temp
     # End of readBytes()
 
@@ -330,31 +365,46 @@ class SlidingWindow(object):
 
     def saveBytes(self, bytes):
         """
-        Saves (packetSize - 10) bytes into the buffer, at the correct place.
+        Saves (packetSize - 10 - 56) bytes into the buffer, at the correct place.
+        Only meant to be used on the Client side.
+        
+        :type bytes: a list of bytes 
+        :param bytes: the list of bytes to be saved
         """
+        if not self.mode == 'Client':
+            print("Sliding Window not in Client mode: %s" % self.mode)
+            return
+        
         if bytes == None:
             print("Error: no bytes provided to be saved")
             return -1
+            
         if len(bytes) > (self.packetSize):
             print("Error: byte array provided is of the wrong size: %d" %
                   len(bytes))
             return -1
+            
         index = bytes[:10]
         # Do nothing if packet already received/marked
         index = int.from_bytes(index, byteorder='big')
+        
         if index in self.marks and self.marks[index]:
             print("Received duplicate packet.")
             return -2
+            
         if index not in self.marks:
             print("Received a packet when its not the packet's turn to be" +
                   " received, with index: %d" % index)
             return -1
+            
         if index > self.fileSize:
             print("Index of received packet greater than file size: %d > %d" %
                   (index, self.fileSize))
             return -1
+            
         for i in range(5):
-            windowIndex = self.start + (i * (self.packetSize - 10))
+            windowIndex = self.start + (i * (self.packetSize - 10 - 56))
+            
             if windowIndex == index:
                 self.arraycopy(
                                src=bytes,

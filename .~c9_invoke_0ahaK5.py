@@ -35,22 +35,6 @@ clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 host = "127.0.0.1"
 
 
-###############################################################################
-# TO-DO:
-# Implement hashing in place of checksums
-# How:
-# sentHash = packet[x:x+56?]
-# zero out the portion of packet containing hash
-# hash = hashlib.sha224(packet.toString).hexdigest()
-# if sentHash == hash, 
-#    no corruption, 
-# else:
-#   packet corrupted and do nothing
-#
-# Might have to implement toString() method
-# Shouldn't be hard - essentially convert packet to bytes, encode bytes as UTF
-###############################################################################
-
 #Send the file request to the server
 #while 1:
 ###########################################################################
@@ -92,7 +76,7 @@ client = window.SlidingWindow(
     "saved/" + dest, mode='Client', fileSize=fileSize)
     
 # Send same acknowledgement back to server to let it know that it can
-# start sending file
+# Not sure about the while, but it's the only way to keep receiving and
 # Keep sending acknowledgement until server starts sending actual file
 ack = []
 ack.extend(acknowledgement)
