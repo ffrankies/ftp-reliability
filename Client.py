@@ -1,11 +1,12 @@
 # 
 # Author: Frank Derry Wanye
 # Author: Gloire Rubambiza
-# Date: 11/29/2016
+# Date: 11/30/2016
 #
 
 import SlidingWindow as window
 import socket
+import hashlib
 from threading import Thread
 
 ###############################################################################
@@ -25,6 +26,9 @@ FPACKET = (4).to_bytes(1, byteorder='big')
 
 # Packet containing file acknowledgement
 FILEACK = (5).to_bytes(1, byteorder='big')
+
+# The number of times the Server will try to send a packet before it gives up
+NUMTRIES = 5
 
 print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 
@@ -51,8 +55,97 @@ host = "127.0.0.1"
 # Shouldn't be hard - essentially convert packet to bytes, encode bytes as UTF
 ###############################################################################
 
+def getHash(packet, start=10):
+    """
+    Returns a string representation of the hash included in the packet.
+    
+    :type packet: list of bytes
+    :param packet: the packet containing a hash
+    
+    :type start: int
+    :param start: the position from which the hash function starts
+    """
+    if packet == None:
+        print("Error: no packet given")
+        return ""
+        
+    if len(packet) < (start + 56):
+        print("Error: packet not long enough to contain hash function")
+        return ""
+    
+    hashbytes = []
+    hashbytes.extend(packet[start:(start + 56)])
+    hashbytes = bytes(hashbytes)
+    hashStr = hashbytes.decode("ISO-8859-1")
+    return hashStr
+# End of getHash()
+        
+def calculateHash(packet):
+    """
+    Calculates the hash of the given packet, assuming that the bytes 
+    containing the hash are already zeroed out.
+    
+    :type packet: a list of bytes | bytes object
+    :param packet: the packet to be hashed
+    
+    :return type: string
+    :return param: a string representation of the hash of the packet
+    """
+    if packet == None:
+        print("Error: no packet given")
+        return ""
+    
+    packetBytes = bytes(packet)
+    #packetStr = packetBytes.decode("UTF-8")
+    hashStr = hashlib.sha224(packetBytes).hexdigest()
+    return hashStr
+# End of calculateHash()
+
+def compareHash(packet, start=10):
+    """
+    Compares the hash included in the packet with the calculated 
+    value of what the hash is supposed to be. Returns True if 
+    they are the same, False if they are not, or there is an 
+    error in the function parameters.
+    
+    :type packet: list of bytes
+    :param packet: the packet containing a hash
+    
+    :type start: int
+    :param start: the position from which the hash function starts
+    """
+    if packet == None:
+        print("Error: no packet given")
+        return False
+        
+    if len(packet) < (start + 56):
+        print("Error: packet not long enough to contain hash function")
+        return False
+        
+    hashStr = getHash(packet, start)
+    
+    # Convert bytes object to list - bytes object cannot be edited
+    packetList = []
+    packetList.extend(packet)
+    
+    # Zero out hash in packet
+    for i in range(56):
+        packetList[i + start] = 0
+    
+    calcHash = calculateHash(packetList)
+    
+    if hashStr == calcHash:
+        return True
+    else:
+        print("Incorrect hash in packet. Given %s, calculated %s" %
+              (hashStr, calcHash))
+        return False
+# End of compareHash()
+
 #Send the file request to the server
 while 1:
+    failed = False
+    
     ###########################################################################
     # Send fileName of requested file to the Server
     ###########################################################################
@@ -61,9 +154,13 @@ while 1:
     filenameBytes = filename.encode("UTF-8")
     filenameBuffer = []
     filenameBuffer.extend(FNAME)
+    filenameBuffer.extend([0]*56)
     filenameBuffer.extend((len(filenameBytes)).to_bytes(9, byteorder='big'))
     filenameBuffer.extend(filenameBytes)
-    filenameBuffer.extend([0]*(1024-10-len(filenameBytes)))
+    filenameBuffer.extend([0]*(1024-10-56-len(filenameBytes)))
+    hashBytes = calculateHash(filenameBuffer).encode("ISO-8859-1")
+    for i in range(56):
+        filenameBuffer[1 + i] = hashBytes[i]
     filenameBuffer = bytes(filenameBuffer)
     # Will eventually attach a checksum to this before sending, resend if
     # acknowledgement not received within a time limit
@@ -73,16 +170,26 @@ while 1:
     # Receive filename acknowledgement from the Server
     # Acknowledgement should contain 10 bytes of fileSize
     ###########################################################################
-    (acknowledgement, addr) = clientSocket.recvfrom(10)
-    while not acknowledgement[0] == FSIZE[0]:
-        clientSocket.sendto(filenameBuffer, (host, port))
-        (acknowledgement, addr) = clientSocket.recvfrom(10)
-    # Proceed or print error message depending on contents of acknowledgment
-    # Send again if acknowledgement not received within timeframe
-    fileSize = int.from_bytes(acknowledgement[1:10], byteorder='big')
+    for i in range(NUMTRIES):
+        print("Waiting for file request acknowledgement...")
+        
+        (acknowledgement, addr) = clientSocket.recvfrom(66)
+        
+        if compareHash(acknowledgement, 1) and acknowledgement[0] == FSIZE[0]:
+            fileSize = int.from_bytes(
+                acknowledgement[57:66], byteorder='big')
+            print("Filesize: %d bytes" % fileSize)
+            break
+        
+        if i == (NUMTRIES - 1):
+            print("Could not receive file name acknowledgement from Server")
+            failed = True
+            continue
+        
+        clientSocket.sendto(acknowledgement, (host, port))
     
-    # Might need a flag signalling that the server is sending file
-    # Else can use global variables flags, maybe.
+    if failed:
+        continue
     
     ###########################################################################
     # Build sliding window, start receiving file
