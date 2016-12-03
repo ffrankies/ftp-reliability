@@ -1,7 +1,7 @@
 # 
 # Author: Frank Derry Wanye
 # Author: Gloire Rubambiza
-# Date: 11/30/2016
+# Date: 12/03/2016
 #
 
 import SlidingWindow as window
@@ -37,23 +37,6 @@ port = 2876
 print ("Creating connection to the server")
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 host = "127.0.0.1"
-
-
-###############################################################################
-# TO-DO:
-# Implement hashing in place of checksums
-# How:
-# sentHash = packet[x:x+56?]
-# zero out the portion of packet containing hash
-# hash = hashlib.sha224(packet.toString).hexdigest()
-# if sentHash == hash, 
-#    no corruption, 
-# else:
-#   packet corrupted and do nothing
-#
-# Might have to implement toString() method
-# Shouldn't be hard - essentially convert packet to bytes, encode bytes as UTF
-###############################################################################
 
 def getHash(packet, start=10):
     """
@@ -142,6 +125,69 @@ def compareHash(packet, start=10):
         return False
 # End of compareHash()
 
+def recvFilePacket(clientSocket, counter):
+    """
+    Receives a file packet from the Client. Compares the hash of the file and
+    passes it on to be saved if it meets all requirements.
+    
+    :type clientSocket: UDP socket
+    :param clientSocket: the socket on which the Client receives/sends packets
+    
+    :type counter: int
+    :param counter: keeps track of how many times the wrong packet has been
+                    received from the Server.
+                    
+    :return type: (list, int) tuple 
+    :return param: the packet converted to list format, and the index of the
+                   packet.
+    """
+    (packet, address) = clientSocket.recvfrom(1024)
+    
+    if compareHash(packet, start=10):
+        if packet[0] == FPACKET[0]:
+            index = (int).from_bytes(packet[1:10], byteorder='big')
+            print("Received file packet %d" % index)
+            packetarr = []
+            packetarr.extend(packet)
+            packetarr[0] = (0).to_bytes(1, byteorder='big')[0]
+            return (packetarr, index)
+        else:
+            print("Received a packet that isn't a file packet.")
+            numFailed += 1
+            return ([], -1)
+    else:
+        print("Received a corrupted packet from %s" % address[0])
+        return ([], -1)
+# End of recvFilePacket()
+
+def sendFileAcknowledgement(clientSocket, packet, host, port):
+    """
+    Sends the acknowledgement for a saved packet, including the calculated 
+    hash value.
+    
+    :type clientSocket: UDP socket
+    :param clientSocket: the socket on which the Client receives/sends packets
+    
+    :type packet: list of bytes
+    :param packet: the packet that is being acknowledged 
+    
+    :type host: string 
+    :param host: the hostname to which the acknowledgement will be sent 
+    
+    :type port: int
+    :param port: the port number on the host to which the packet will be 
+                 passed
+    """
+    acknowledgement = []
+    acknowledgement.extend(FILEACK)
+    acknowledgement.extend(packet[1:10])
+    acknowledgement.extend([0] * 56)
+    hashBytes = calculateHash(acknowledgement).encode("ISO-8859-1")
+    for i in range(56):
+        acknowledgement[10 + i] = hashBytes[i]
+    clientSocket.sendto(bytes(acknowledgement), (host, port))
+# End of sendFileAcknowledgement()
+
 #Send the file request to the server
 while 1:
     failed = False
@@ -204,6 +250,13 @@ while 1:
     ack = []
     ack.extend(acknowledgement)
     ack[0] = FREADYACK[0]
+    # Zero out the hash
+    for i in range(56):
+        ack[i + 1] = 0
+    hashBytes = calculateHash(ack).encode("ISO-8859-1")
+    # Append new hash to packet
+    for i in range(56):
+        ack[i + 1] = hashBytes[i]
     
     # Send acknowledgment back to Server, this time with the file ready flag
     clientSocket.sendto(bytes(ack), (host, port))
@@ -211,30 +264,23 @@ while 1:
     # Save file using slidingWindow
     # Not sure about the while, but it's the only way to keep receiving and
     # acknowledging packets at the same time
+    numFailed = 0
     while 1:
-        (packet, addr) = clientSocket.recvfrom(1024)
-        index = (int).from_bytes(packet[1:10], byteorder='big')
-        if packet[0] == FPACKET[0]: # If it is a file packet
-            print("Received file packet %d" % index)
-            # Not sure about how to check that we have not received this
-            # packet previously
-            packetarr = []
-            packetarr.extend(packet)
-            packetarr[0] = (0).to_bytes(1, byteorder='big')[0]
+        (packetarr, index) = recvFilePacket(clientSocket, numFailed)
+        if not packetarr == []:
             bytesSent = client.saveBytes(packetarr)
             if bytesSent != -1:
-                # Building acknowledgement
-                acknowledgement = []
-                acknowledgement.extend(FILEACK)
-                acknowledgement.extend(packet[1:10])
-                acknowledgement.extend([0]*28)
-                clientSocket.sendto(bytes(acknowledgement), (host, port))
+                sendFileAcknowledgement(clientSocket, packetarr, host, port)
                 print("Sent acknowledgement of packet %d" % index)
             if bytesSent == "Done":
                 print("Done receiving file.")
                 break;
-        else:
+        else: # If it is not a file packet, send ready acknowledgement again
+            if numFailed == 5: 
+                print("Could not receive file packet from Server.")
+                break
             clientSocket.sendto(bytes(ack), (host, port))
+            numFailed += 1
     # Need to think of way of knowing when to stop receiving
     # I don't know to implement it in sliding window cuz I haven't seen saveBytes
     #   method in action

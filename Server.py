@@ -37,7 +37,7 @@ class Server(object):
     author: Frank Derry Wanye
     author: Gloire Rubambiza
 
-    date: 11/30/2016
+    date: 12/03/2016
     """
 
     def __init__(self):
@@ -53,6 +53,7 @@ class Server(object):
         
         while 1:
             self.serverInstance()
+    # End of __init__()
             
     def serverInstance(self):
         """
@@ -101,12 +102,20 @@ class Server(object):
         ######################################################################
         # Receiving ready signal from Client
         ######################################################################
-        (ready, address) = self.serverSocket.recvfrom(10)
-        while not ready[0] == FREADYACK[0]:
-            self.serverSocket.sendto(filesizePacket, address)
-            (ready, address) = self.serverSocket.recvfrom(10)
-
-        #time.sleep(5)
+        for i in range(NUMTRIES):
+            print("Waiting for ready acknowledgement from Client...")
+            
+            (fready, address) = self.serverSocket.recvfrom(66)
+            
+            if fready[0] == FREADYACK[0] and self.compareHash(fready, 1):
+                print("Client ready to receive file.")
+                break
+            else:
+                self.serverSocket.sendto(filesizePacket, address)
+            
+            if i == (NUMTRIES - 1):
+                print("Could not receive ready acknowledgement from Client")
+                return
         
         self.slidingWindow = window.SlidingWindow(
             "files/" + filename, mode='Server')
@@ -125,6 +134,7 @@ class Server(object):
         
         self.sendThread.join()
         self.ackThread.join()
+    # End of serverInstance()
         
     def HandleClients(self, address):
         '''
@@ -146,19 +156,14 @@ class Server(object):
             #time.sleep(1)
             print("Num packets in sliding window: %d" % len(packets))
             for packet in packets:
-                packet[0] = FPACKET[0]
-                while packet[-1] == None:
-                    del packet[-1]
-                packet = bytes(packet)
-                print("Sending packet: %d starting with %d" %
-                    (int.from_bytes(packet[1:10], byteorder='big'), packet[0]))
-                self.serverSocket.sendto(packet, address)
+                self.sendFilePacket(packet, address)
             time.sleep(0.1)
             self.lock.acquire()
             packets = self.slidingWindow.getPackets()
             self.lock.release()
         print("Packets left in sliding window: %d" % len(packets))
         return
+    # End of handleClients()
 
     def clientAcknowledgements(self):
         """
@@ -166,20 +171,65 @@ class Server(object):
         window packets as received by the Client.
         """
         while 1:
-            (acknowledgement, addr) = self.serverSocket.recvfrom(38)
-            if acknowledgement[0] == FILEACK[0]:
-                index = int.from_bytes(acknowledgement[1:10], byteorder='big')
-                print("Received acknowledgment from %s for packet %d" % 
-                      (addr[0], index))
-                # Implementation for checking will be done in part 2
-                checksum = acknowledgement[10:]
+            index = self.recvFileAcknowledgement()
+            
+            if not index == -1:
                 self.lock.acquire()
                 self.slidingWindow.mark(index)
                 self.lock.release()
+                
                 if self.slidingWindow.isDone():
                     print("Finished sending file")
                     break
+            
         return
+    # End of clientAcknowledgements()
+    
+    def sendFilePacket(self, packet, address):
+        """
+        Inserts the hash for a packet and sends it to the client. 
+        
+        :type packet: a list of bytes
+        :param packet: the packet to be sent, with the hash positions zeroed out
+        
+        :type address: (string, int) tuple
+        :param address: the address to which the packet will be sent
+        """
+        packet[0] = FPACKET[0]
+        
+        # Removing unused bytes from packet
+        while packet[-1] == None:
+            del packet[-1]
+            
+        hashBytes = self.calculateHash(packet).encode("ISO-8859-1")
+        
+        # Adding hash to the packet
+        for i in range(56):
+            packet[i + 10] = hashBytes[i]
+        
+        print("Sending packet: %d starting with %d" %
+            (int.from_bytes(packet[1:10], byteorder='big'), packet[0]))
+            
+        self.serverSocket.sendto(bytes(packet), address)
+    # End of sendFilePacket()
+    
+    def recvFileAcknowledgement(self):
+        """
+        Receives a file acknowledgement from the Client. Checks the hash of the 
+        packet, and returns the index of the acknowledged packet if the 
+        acknowledgement meets all criteria.
+        """
+        (packet, address) = self.serverSocket.recvfrom(66)
+        
+        # If it is an acknowledgement packet
+        if packet[0] == FILEACK[0] and self.compareHash(packet, start=10):
+            index = int.from_bytes(packet[1:10], byteorder='big')
+            print("Received acknowledgment from %s for packet %d" % 
+                      (address[0], index))
+            return index 
+        else:
+            return -1
+    # End of recvFileAcknowledgement()
     
     def getHash(self, packet, start=10):
         """
