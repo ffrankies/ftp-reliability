@@ -49,7 +49,7 @@ class Server(object):
         print ("Creating server socket on port %s." % port)
 
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.serverSocket.bind(("10.0.0.2", port))
+        self.serverSocket.bind(("10.0.0.2", int(port)))
         
         while 1:
             self.serverInstance()
