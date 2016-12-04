@@ -33,7 +33,8 @@ NUMTRIES = 5
 print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 
 
-port = input("What port number would you like to connect to?")
+userInput = input("What port number would you like to connect to?")
+port = int(userInput)
 print ("Creating connection to the server")
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 host = input("Please specify a server IP Address")
