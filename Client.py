@@ -33,10 +33,10 @@ NUMTRIES = 5
 print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 
 
-port = 2876
+port = input("What port number would you like to connect to?")
 print ("Creating connection to the server")
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-host = "127.0.0.1"
+host = input("Please specify a server IP Address")
 
 def getHash(packet, start=10):
     """
@@ -284,6 +284,8 @@ while 1:
     # Need to think of way of knowing when to stop receiving
     # I don't know to implement it in sliding window cuz I haven't seen saveBytes
     #   method in action
+
+
 
 # I don't think I've implemented that in slidingWindow yet...
 #

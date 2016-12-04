@@ -45,11 +45,11 @@ class Server(object):
         Initializes a Server on the localhost with a port number of 2876.
         """
 
-        port = 2876
+        port = input("What port number would you like to connect to?")
         print ("Creating server socket on port %d." % port)
 
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.serverSocket.bind(("127.0.0.1", port))
+        self.serverSocket.bind(("10.0.0.2", port))
         
         while 1:
             self.serverInstance()
