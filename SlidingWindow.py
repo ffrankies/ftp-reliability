@@ -395,7 +395,7 @@ class SlidingWindow(object):
         if index not in self.marks:
             print("Received a packet when its not the packet's turn to be" +
                   " received, with index: %d" % index)
-            return -1
+            return -2
             
         if index > self.fileSize:
             print("Index of received packet greater than file size: %d > %d" %
