@@ -45,11 +45,12 @@ class Server(object):
         Initializes a Server on the localhost with a port number of 2876.
         """
 
-        port = input("What port number would you like to connect to?")
-        print ("Creating server socket on port %s." % port)
+        addr = input("What address is the server being set up on?\n")
+        port = input("What port number would you like to connect to?\n")
+        print ("Creating server socket on port %s, address %s." % (port, addr))
 
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.serverSocket.bind(("10.0.0.2", int(port)))
+        self.serverSocket.bind((addr, int(port)))
         
         while 1:
             self.serverInstance()
@@ -60,6 +61,7 @@ class Server(object):
         Receives a file requested by the Client. 
         """
         self.lock = Lock()
+        self.sentCounter = dict()
 
         ###################################################################
         # Obtaining requested files from the Client
@@ -156,7 +158,8 @@ class Server(object):
             #time.sleep(1)
             print("Num packets in sliding window: %d" % len(packets))
             for packet in packets:
-                self.sendFilePacket(packet, address)
+                if not self.sendFilePacket(packet, address):
+                    return
             time.sleep(0.1)
             self.lock.acquire()
             packets = self.slidingWindow.getPackets()
@@ -206,11 +209,23 @@ class Server(object):
         # Adding hash to the packet
         for i in range(56):
             packet[i + 10] = hashBytes[i]
+            
+        index = int.from_bytes(packet[1:10], byteorder='big')
+        
+        if index in self.sentCounter:
+            if self.sentCounter[index] == NUMTRIES:
+                print("Client not receiving packet after 5 tries.")
+                return False
+            else:
+                self.sentCounter[index] += 1
+        else:
+            self.sentCounter[index] = 1
         
         print("Sending packet: %d starting with %d" %
             (int.from_bytes(packet[1:10], byteorder='big'), packet[0]))
             
         self.serverSocket.sendto(bytes(packet), address)
+        return True
     # End of sendFilePacket()
     
     def recvFileAcknowledgement(self):
