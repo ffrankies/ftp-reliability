@@ -32,13 +32,6 @@ NUMTRIES = 5
 
 print("Flags: %s %s %s %s" % (FNAME[0], FSIZE[0], FREADYACK[0], FPACKET[0]))
 
-
-userInput = input("What port number would you like to connect to?\n")
-port = int(userInput)
-print ("Creating connection to the server")
-clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-host = input("Please specify a server IP Address:\n")
-
 def getHash(packet, start=10):
     """
     Returns a string representation of the hash included in the packet.
@@ -189,6 +182,17 @@ def sendFileAcknowledgement(clientSocket, packet, host, port):
     clientSocket.sendto(bytes(acknowledgement), (host, port))
 # End of sendFileAcknowledgement()
 
+#############################################################################
+# Starting the Client socket
+#############################################################################
+
+userInput = input("What port number would you like to connect to?\n")
+port = int(userInput)
+print ("Creating connection to the server")
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+clientSocket.settimeout(2.0)
+host = input("Please specify a server IP Address:\n")
+
 #Send the file request to the server
 while 1:
     failed = False
@@ -198,6 +202,9 @@ while 1:
     ###########################################################################
     filename = input("Please enter the name of the file you want to download " +
                      "from the Server: ")
+                     
+    dest = input("What should the file be saved as? ")
+    
     filenameBytes = filename.encode("UTF-8")
     filenameBuffer = []
     filenameBuffer.extend(FNAME)
@@ -220,7 +227,12 @@ while 1:
     for i in range(NUMTRIES):
         print("Waiting for file request acknowledgement...")
         
-        (acknowledgement, addr) = clientSocket.recvfrom(66)
+        try:
+            (acknowledgement, addr) = clientSocket.recvfrom(66)
+        except socket.timeout:
+            print("Timed out on receive, assuming connection broken")
+            failed = True
+            break
         
         if compareHash(acknowledgement, 1) and acknowledgement[0] == FSIZE[0]:
             fileSize = int.from_bytes(
@@ -231,7 +243,7 @@ while 1:
         if i == (NUMTRIES - 1):
             print("Could not receive file name acknowledgement from Server")
             failed = True
-            continue
+            break
         
         clientSocket.sendto(acknowledgement, (host, port))
     
@@ -241,7 +253,6 @@ while 1:
     ###########################################################################
     # Build sliding window, start receiving file
     ###########################################################################
-    dest = input("What should the file be saved as? ")
     client = window.SlidingWindow(
         "saved/" + dest, mode='Client', fileSize=fileSize)
         
@@ -267,7 +278,12 @@ while 1:
     # acknowledging packets at the same time
     numFailed = 0
     while 1:
-        (packetarr, index) = recvFilePacket(clientSocket, numFailed)
+        try:
+            (packetarr, index) = recvFilePacket(clientSocket, numFailed)
+        except socket.timeout:
+            print("Socket timed out, connection assumed to be broken.")
+            break
+        
         if not packetarr == []:
             bytesSent = client.saveBytes(packetarr)
             if bytesSent != -1:

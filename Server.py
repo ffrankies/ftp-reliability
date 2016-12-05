@@ -37,7 +37,7 @@ class Server(object):
     author: Frank Derry Wanye
     author: Gloire Rubambiza
 
-    date: 12/03/2016
+    date: 12/05/2016
     """
 
     def __init__(self):
@@ -77,6 +77,7 @@ class Server(object):
                 filenameLen = int.from_bytes(
                     filerequest[57:66], byteorder='big')
                 filename = filerequest[66:(66 + filenameLen)].decode("UTF-8")
+                self.serverSocket.settimeout(2.0)
                 print("Requested file name: %s" % filename)
                 break
             
@@ -107,7 +108,12 @@ class Server(object):
         for i in range(NUMTRIES):
             print("Waiting for ready acknowledgement from Client...")
             
-            (fready, address) = self.serverSocket.recvfrom(66)
+            try:
+                (fready, address) = self.serverSocket.recvfrom(66)
+            except socket.timeout:
+                print("Socket timed out when receiving ready acknowledgment.")
+                self.serverSocket.settimeout(None)
+                return
             
             if fready[0] == FREADYACK[0] and self.compareHash(fready, 1):
                 print("Client ready to receive file.")
@@ -176,15 +182,18 @@ class Server(object):
         while 1:
             index = self.recvFileAcknowledgement()
             
-            if not index == -1:
+            if not (index == -1 or index == -2):
                 self.lock.acquire()
                 self.slidingWindow.mark(index)
                 self.lock.release()
                 
                 if self.slidingWindow.isDone():
                     print("Finished sending file")
+                    self.serverSocket.settimeout(None)
                     break
-            
+            if index == -2:
+                print("Connection assumed to be broken")
+                return
         return
     # End of clientAcknowledgements()
     
@@ -234,7 +243,12 @@ class Server(object):
         packet, and returns the index of the acknowledged packet if the 
         acknowledgement meets all criteria.
         """
-        (packet, address) = self.serverSocket.recvfrom(66)
+        try:
+            (packet, address) = self.serverSocket.recvfrom(66)
+        except socket.timeout:
+            print("Receive operation timed out.")
+            self.serverSocket.settimeout(None)
+            return -2
         
         # If it is an acknowledgement packet
         if packet[0] == FILEACK[0] and self.compareHash(packet, start=10):
