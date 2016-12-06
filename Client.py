@@ -283,6 +283,7 @@ while 1:
             break
         
         if not packetarr == []:
+            numFailed = 0
             bytesSent = client.saveBytes(packetarr)
             if bytesSent != -1:
                 sendFileAcknowledgement(clientSocket, packetarr, host, port)
