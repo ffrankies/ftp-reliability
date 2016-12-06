@@ -274,8 +274,6 @@ while 1:
     clientSocket.sendto(bytes(ack), (host, port))
     #
     # Save file using slidingWindow
-    # Not sure about the while, but it's the only way to keep receiving and
-    # acknowledging packets at the same time
     numFailed = 0
     while 1:
         try:
@@ -298,11 +296,3 @@ while 1:
                 break
             clientSocket.sendto(bytes(ack), (host, port))
             numFailed += 1
-    # Need to think of way of knowing when to stop receiving
-    # I don't know to implement it in sliding window cuz I haven't seen saveBytes
-    #   method in action
-
-
-
-# I don't think I've implemented that in slidingWindow yet...
-#
